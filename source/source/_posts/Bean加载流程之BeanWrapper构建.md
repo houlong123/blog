@@ -478,10 +478,238 @@ public static <T> T instantiateClass(Constructor<T> ctor, Object... args) throws
 
 最后注意一下，这里被实例化出来的Bean并不会直接返回，而是会被包装为BeanWrapper继续在后面使用。
 
+#### populateBean源码
+该源码实现了bean的属性注入。
+
+```java
+protected void populateBean(String beanName, RootBeanDefinition mbd, BeanWrapper bw) {
+    Object pvs = mbd.getPropertyValues();
+    if(bw == null) {
+        if(!((PropertyValues)pvs).isEmpty()) {
+            throw new BeanCreationException(mbd.getResourceDescription(), beanName, "Cannot apply property values to null instance");
+        }
+    } else {
+        boolean continueWithPropertyPopulation = true;
+        if(!mbd.isSynthetic() && this.hasInstantiationAwareBeanPostProcessors()) {
+            Iterator hasInstAwareBpps = this.getBeanPostProcessors().iterator();
+            while(hasInstAwareBpps.hasNext()) {
+                BeanPostProcessor needsDepCheck = (BeanPostProcessor)hasInstAwareBpps.next();
+                if(needsDepCheck instanceof InstantiationAwareBeanPostProcessor) {
+                    InstantiationAwareBeanPostProcessor filteredPds = (InstantiationAwareBeanPostProcessor)needsDepCheck;
+                    if(!filteredPds.postProcessAfterInstantiation(bw.getWrappedInstance(), beanName)) {
+                        continueWithPropertyPopulation = false;
+                        break;
+                    }
+                }
+            }
+        }
+        if(continueWithPropertyPopulation) {
+            if(mbd.getResolvedAutowireMode() == 1 || mbd.getResolvedAutowireMode() == 2) {
+                MutablePropertyValues hasInstAwareBpps1 = new MutablePropertyValues((PropertyValues)pvs);
+                if(mbd.getResolvedAutowireMode() == 1) {
+                    //Add property values based on autowire by name if applicable
+                    this.autowireByName(beanName, mbd, bw, hasInstAwareBpps1);
+                }
+                if(mbd.getResolvedAutowireMode() == 2) {
+                    //Add property values based on autowire by type if applicable
+                    this.autowireByType(beanName, mbd, bw, hasInstAwareBpps1);
+                }
+                pvs = hasInstAwareBpps1;
+            }
+            boolean hasInstAwareBpps2 = this.hasInstantiationAwareBeanPostProcessors();
+            boolean needsDepCheck1 = mbd.getDependencyCheck() != 0;
+            if(hasInstAwareBpps2 || needsDepCheck1) {
+                PropertyDescriptor[] filteredPds1 = this.filterPropertyDescriptorsForDependencyCheck(bw, mbd.allowCaching);
+                if(hasInstAwareBpps2) {
+                    Iterator var9 = this.getBeanPostProcessors().iterator();
+                    while(var9.hasNext()) {
+                        BeanPostProcessor bp = (BeanPostProcessor)var9.next();
+                        if(bp instanceof InstantiationAwareBeanPostProcessor) {
+                            InstantiationAwareBeanPostProcessor ibp = (InstantiationAwareBeanPostProcessor)bp;
+                            pvs = ibp.postProcessPropertyValues((PropertyValues)pvs, filteredPds1, bw.getWrappedInstance(), beanName);
+                            if(pvs == null) {
+                                return;
+                            }
+                        }
+                    }
+                }
+                if(needsDepCheck1) {
+                    this.checkDependencies(beanName, mbd, filteredPds1, (PropertyValues)pvs);
+                }
+            }
+            //pvs的实现类为MutablePropertyValues，里面持有一个List<PropertyValue>，每一个PropertyValue包含了此Bean属性的属性名与属性值
+            this.applyPropertyValues(beanName, mbd, bw, (PropertyValues)pvs);
+        }
+    }
+}
+```
+
+#### applyPropertyValues源码
+
+```java
+protected void applyPropertyValues(String beanName, BeanDefinition mbd, BeanWrapper bw, PropertyValues pvs) {
+    if(pvs != null && !pvs.isEmpty()) {
+        MutablePropertyValues mpvs = null;
+        if(System.getSecurityManager() != null && bw instanceof BeanWrapperImpl) {
+            ((BeanWrapperImpl)bw).setSecurityContext(this.getAccessControlContext());
+        }
+        List original;
+        if(pvs instanceof MutablePropertyValues) {
+            mpvs = (MutablePropertyValues)pvs;
+            if(mpvs.isConverted()) {
+                try {
+                    bw.setPropertyValues(mpvs);
+                    return;
+                } catch (BeansException var18) {
+                    throw new BeanCreationException(mbd.getResourceDescription(), beanName, "Error setting property values", var18);
+                }
+            }
+            original = mpvs.getPropertyValueList();
+        } else {
+            original = Arrays.asList(pvs.getPropertyValues());
+        }
+        Object converter = this.getCustomTypeConverter();
+        if(converter == null) {
+            converter = bw;
+        }
+        BeanDefinitionValueResolver valueResolver = new BeanDefinitionValueResolver(this, beanName, mbd, (TypeConverter)converter);
+        //create a deep copy, resolving any references for values
+        ArrayList deepCopy = new ArrayList(original.size());
+        boolean resolveNecessary = false;
+        Iterator ex = original.iterator();
+        while(true) {
+            while(ex.hasNext()) {
+                PropertyValue pv = (PropertyValue)ex.next();
+                if(pv.isConverted()) {
+                    deepCopy.add(pv);
+                } else {
+                    String propertyName = pv.getName();
+                    Object originalValue = pv.getValue();
+                    Object resolvedValue = valueResolver.resolveValueIfNecessary(pv, originalValue);
+                    Object convertedValue = resolvedValue;
+                    boolean convertible = bw.isWritableProperty(propertyName) && !PropertyAccessorUtils.isNestedOrIndexedProperty(propertyName);
+                    if(convertible) {
+                        convertedValue = this.convertForProperty(resolvedValue, propertyName, bw, (TypeConverter)converter);
+                    }
+                    if(resolvedValue == originalValue) {
+                        if(convertible) {
+                            pv.setConvertedValue(convertedValue);
+                        }
+                        deepCopy.add(pv);
+                    } else if(convertible && originalValue instanceof TypedStringValue && !((TypedStringValue)originalValue).isDynamic() && !(convertedValue instanceof Collection) && !ObjectUtils.isArray(convertedValue)) {
+                        pv.setConvertedValue(convertedValue);
+                        deepCopy.add(pv);
+                    } else {
+                        resolveNecessary = true;
+                        deepCopy.add(new PropertyValue(pv, convertedValue));
+                    }
+                }
+            }
+            if(mpvs != null && !resolveNecessary) {
+                mpvs.setConverted();
+            }
+            try {
+                bw.setPropertyValues(new MutablePropertyValues(deepCopy));
+                return;
+            } catch (BeansException var19) {
+                throw new BeanCreationException(mbd.getResourceDescription(), beanName, "Error setting property values", var19);
+            }
+        }
+    }
+}
+```
+
+功能分析：
+
+该方法的主要功能是实现bean内属性的转换，因为在解析beanDefinition时，属性都是以String类型存储的，因此需要类型转换。String中内置的类型转换类有：ByteArrayPropertyEditor, ClassEditor, CustomBooleanEditor, CustomCollectionEditor等，需要深入了解，可以学习Spring官网 [Validation, Data Binding, and Type Conversion](https://docs.spring.io/spring/docs/current/spring-framework-reference/core.html#validation)
+
+#### initializeBean源码
+
+```java
+protected Object initializeBean(final String beanName, final Object bean, RootBeanDefinition mbd) {
+    if(System.getSecurityManager() != null) {
+        AccessController.doPrivileged(new PrivilegedAction() {
+            public Object run() {
+                AbstractAutowireCapableBeanFactory.this.invokeAwareMethods(beanName, bean);
+                return null;
+            }
+        }, this.getAccessControlContext());
+    } else {
+        //Aware注入。在使用Spring的时候我们将自己的Bean实现BeanNameAware接口、BeanFactoryAware接口等，依赖容器帮我们注入当前Bean的名称或者Bean工厂
+        this.invokeAwareMethods(beanName, bean);
+    }
+    Object wrappedBean = bean;
+    if(mbd == null || !mbd.isSynthetic()) {
+        //执行BeanPostProcessor接口方法，在bean初始化之前执行
+        wrappedBean = this.applyBeanPostProcessorsBeforeInitialization(bean, beanName);
+    }
+    try {
+        //如果bean实现了InitializingBean或者设置了init-method属性，则执行相应的操作
+        this.invokeInitMethods(beanName, wrappedBean, mbd);
+    } catch (Throwable var6) {
+        throw new BeanCreationException(mbd != null?mbd.getResourceDescription():null, beanName, "Invocation of init method failed", var6);
+    }
+    if(mbd == null || !mbd.isSynthetic()) {
+          //执行BeanPostProcessor接口方法，在bean初始化之后执行
+        wrappedBean = this.applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);
+    }
+    return wrappedBean;
+}
+```
+
+功能分析：
+
+我们得知，在invokeInitMethods的执行前后，spring会分别调用所有的BeanPostProcessor，执行其中的方法。invokeInitMethods方法主要作用有两个：
+
+1. 判断bean是否继承了InitializingBean，如果继承接口，执行afterPropertiesSet()方法，
+
+2. 获得是否设置了init-method属性，如果设置了，就执行设置的方法
 
 
+#### invokeInitMethods源码
+
+```java
+protected void invokeInitMethods(String beanName, final Object bean, RootBeanDefinition mbd) throws Throwable {
+    boolean isInitializingBean = bean instanceof InitializingBean;
+    //如果bean继承了InitializingBean，则只执行afterPropertiesSet方法
+    if(isInitializingBean && (mbd == null || !mbd.isExternallyManagedInitMethod("afterPropertiesSet"))) {
+        if(this.logger.isDebugEnabled()) {
+            this.logger.debug("Invoking afterPropertiesSet() on bean with name \'" + beanName + "\'");
+        }
+        if(System.getSecurityManager() != null) {
+            try {
+                AccessController.doPrivileged(new PrivilegedExceptionAction() {
+                    public Object run() throws Exception {
+                        ((InitializingBean)bean).afterPropertiesSet();
+                        return null;
+                    }
+                }, this.getAccessControlContext());
+            } catch (PrivilegedActionException var6) {
+                throw var6.getException();
+            }
+        } else {
+            ((InitializingBean)bean).afterPropertiesSet();
+        }
+    }
+    //如果设置了init-method属性，则执行设置的方法
+    if(mbd != null) {
+        String initMethodName = mbd.getInitMethodName();
+        if(initMethodName != null && (!isInitializingBean || !"afterPropertiesSet".equals(initMethodName)) && !mbd.isExternallyManagedInitMethod(initMethodName)) {
+            this.invokeCustomInitMethod(beanName, bean, mbd);
+        }
+    }
+}
+```
+
+整个bean加载顺序图：
+
+![Bean实例化过程](http://thumbsnap.com/i/c5DXvHI7.jpg)
 
 ### 参考文献
-[【Spring源码分析】非懒加载的单例Bean初始化过程（上篇](http://www.cnblogs.com/xrq730/p/6361578.html)
+[原型Bean实例化过程、byName与byType及FactoryBean获取Bean源码实现](http://www.cnblogs.com/xrq730/p/6685528.html)
 
 [ BeanPostProcessor的使用](http://www.cnblogs.com/jyyzzjl/p/5417418.html)
+
+[非懒加载的单例Bean初始化过程（上篇)](http://www.cnblogs.com/xrq730/p/6361578.html)
+
+[非懒加载的单例Bean初始化过程（下篇)](http://www.cnblogs.com/xrq730/p/6363055.html)
