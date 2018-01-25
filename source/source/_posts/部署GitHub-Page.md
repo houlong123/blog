@@ -4,7 +4,6 @@ date: 2017-07-03 17:45:04
 tags: 部署GitHub Page
 ---
 
-#### 部署GitHub Page
 ##### 环境
 
 + git
@@ -19,7 +18,7 @@ tags: 部署GitHub Page
 
 ##### 安装nodejs
 
-+ nodejs 的安装有多重方式，本例是通过nvm来安装nodejs。首先，安装nvm 。
++ nodejs 的安装有多重方式，本例是通过nvm来安装nodejs。首先，[安装nvm](http://weizhifeng.net/node-version-management-via-n-and-nvm.html) 。
 
 + 配置文件
 
@@ -58,7 +57,7 @@ fi
 ```
 # mkdir A
 # cd A
-# hexo init A
+# hexo init
 # npm install
 ```
 
@@ -122,9 +121,9 @@ deploy:
 
 ##### 常见错误
 
-执行 hexo deploy 后,出现 error deployer not found:github 的错误
+执行 hexo deploy 后,出现 <font color=red>error deployer not found:github</font> 的错误
 hexo 更新到3.0之后，deploy的type 的github需要改成git, 接着
-npm install hexo-deployer-git –save 改了之后执行，然后再部署
+** npm install hexo-deployer-git –save ** 改了之后执行，然后再部署
 
 
 #### 日常部署步骤
