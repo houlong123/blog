@@ -123,7 +123,7 @@ deploy:
 
 执行 hexo deploy 后,出现 <font color=red>error deployer not found:github</font> 的错误
 hexo 更新到3.0之后，deploy的type 的github需要改成git, 接着
-** npm install hexo-deployer-git –save ** 改了之后执行，然后再部署
+** npm install hexo-deployer-git -save ** 改了之后执行，然后再部署
 
 
 #### 日常部署步骤
