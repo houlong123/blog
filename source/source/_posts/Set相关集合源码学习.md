@@ -7,6 +7,14 @@ tags: java基础集合
 ### 前言
 在前面几个章节中，已经对集合中的 `List`列表一支进行了相关的学习。在我们日常编程中，使用最多的集合还有 `Set` 。本章我们将学习Set的相关知识。
 
+```
+graph TD
+A[Christmas] -->|Get money| B(Go shopping)
+B --> C{Let me think}
+C -->|One| D[Laptop]
+C -->|Two| E[iPhone]
+C -->|Three| F[Car]
+```
 
 #### java基础集合框架
 <a data-flickr-embed="true"  href="http://img.blog.csdn.net/20140628144205625" title="java基础集合框架"><img src="http://img.blog.csdn.net/20140628144205625" width="640" height="453" alt="java基础集合框架"></a>
