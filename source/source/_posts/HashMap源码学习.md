@@ -1,8 +1,13 @@
+---
+title: HashMap源码学习
+date: 2018-02-02 13:32:21
+tags: java基础集合
+---
+
 #### 前言
 Java为数据结构中的映射定义了一个接口java.util.Map，此接口主要有四个常用的实现类，分别是HashMap、Hashtable、LinkedHashMap和TreeMap。其中HashMap是Java程序员使用频率最高的用于映射(键值对)处理的数据类型。<font color=red>HashMap是一种无序的，且允许null作为键值对的Map集合。该类除了不是同步的，且允许null键值对外，其他都与Hashtable基本一致。</font>由于Hashtable是遗留类，且并发性不如ConcurrentHashMap，所以在新代码中基本上不使用。HashMap的底层采用 `Node数组+链表+红黑树` 的存储结构。该类除了没有并发功能外，与 [ConcurrentHashMap](https://houlong123.github.io/2017/11/07/ConcurrentHashMap源码学习/) 类基本一致。
 
-
-![存储结构](http://incdn1.b0.upaiyun.com/2017/07/665f644e43731ff9db3d341da5c827e1.png)
+<a data-flickr-embed="true"  href="https://www.flickr.com/photos/157389715@N05/25164209287/in/dateposted-public/" title="存储结构"><img src="https://farm5.staticflickr.com/4649/25164209287_7a8a2fa261.jpg" width="500" height="170" alt="665f644e43731ff9db3d341da5c827e1"></a>
 
 
 #### 源码解析
@@ -1087,3 +1092,5 @@ final class EntryIterator extends HashIterator
 [Java 8系列之重新认识HashMap](https://tech.meituan.com/java-hashmap.html)
 
 [Java Map 集合类简介 ](http://www.oracle.com/technetwork/cn/articles/maps1-100947-zhs.html)
+
+[HashMap 源码详细分析(JDK1.8)](http://www.coolblog.xyz/2018/01/18/HashMap-%E6%BA%90%E7%A0%81%E8%AF%A6%E7%BB%86%E5%88%86%E6%9E%90-JDK1-8/)
